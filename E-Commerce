@@ -1,0 +1,83 @@
+import requests                                  # Importing the 'requests' library to make HTTP requests
+from bs4 import BeautifulSoup as ms              # Importing BeautifulSoup module to parse HTML and XML documents
+import smtplib                                   # Importing the 'smtplib' library to send email using Simple Mail Transfer Protocol (SMTP)
+import ssl                                       # Importing the 'ssl' library to provide a secure socket layer (SSL) for network communication
+from email.message import EmailMessage           # Importing the 'EmailMessage' class from the 'email.message' module
+
+# The URL of the product page we want to scrape
+URL = "https://www.amazon.in/Apple-MacBook-Chip-13-inch-256GB/dp/B08N5T6CZ6/ref=sr_1_1_sspa?crid=2ATG7O2B9WDUK&keywords=macbook%2Bair&qid=1683745223&sprefix=%2Caps%2C167&sr=8-1-spons&sp_csd=d2lkZ2V0TmFtZT1zcF9hdGY&th=1"
+response = requests.get(URL)
+
+# User-Agent header to be used in the HTTP request to mimic a browser
+header = {'User-Agent': 'Mozilla/5.0 (Windows Phone 10.0; Android 6.0.1; Microsoft; RM-1152) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/52.0.2743.116 Mobile Safari/537.36 Edge/15.15254'}
+
+# A function to extract the price of the product from the product page
+def product_price():
+    page = requests.get(URL, headers=header)
+    soup = ms(page.content, 'html.parser')             # Parse the content of the page using BeautifulSoup
+    price_str = soup.find('span', {'class': 'a-price-whole'}).text.split()[0].replace(',',"")                # Find the HTML element that contains the price and extract the text
+    price = float(price_str)                              # Removed the duplicate line and assigned price_str to the extracted price string
+    return price
+
+def discount():
+  response = requests.get(URL)
+  content = response.content
+  soup = ms(content, 'html.parser')
+  discount_percentage = soup.find('span', {'class': 'a-size-large a-color-price savingPriceOverride aok-align-center reinventPriceSavingsPercentageMargin savingsPercentage'}).text
+  return discount_percentage
+
+# A function to send an email notification if the price drops below the target price
+def notify(p):
+    port = 465  # For SSL
+    smtp_server = "smtp.gmail.com"            # The address of the SMTP server
+    sender_mail = "pythonprojectsp23@gmail.com"
+    receiver_mail = "pythonprojectsp23@gmail.com"
+    password = 'ajvmbpnbbdtbrwje'
+    
+    if (p!="stillhigh"):          # If the price has dropped below the target price
+      subject = 'BUY NOW!'        # Set the email subject
+      # Set the email message
+      message = f"""
+    Price has dropped! Buy your product now!
+    
+    Click the link to check it out! 
+    Link: {URL}                                                            
+
+    Original Price: Rs.{my_price:,}                       
+
+    Discount: {discount()}
+
+    Final Price: Rs.{product_price():,}
+
+    """                                                 
+    else:
+      subject = 'DO NOT BUY NOW!'                 # If the price is still high, set the email subject accordingly
+      message = f""" 
+      Price of this product is still very high! It is not a good idea to buy right now."
+      
+      Click the link to check it out! 
+      Link: {URL}
+      
+      """
+
+    m = EmailMessage()
+    m['From'] = sender_mail
+    m['To'] = receiver_mail
+    m['Subject'] = subject
+    m.set_content(message)
+    context = ssl.create_default_context()                 # create a default SSL context
+    with smtplib.SMTP_SSL(smtp_server, port, context=context) as server:
+        server.login(sender_mail, password)
+        server.send_message(m)  # Use send_message instead of sendmail
+        print("Message Sent")
+
+my_price = 95000.0
+while True:                
+    if product_price() <= my_price:                    # checking the prices
+        notify("buy")                                  
+        break
+    else:
+        print("Price of this product is still very high!")
+        notify("stillhigh")
+        break
+
